@@ -1,0 +1,6 @@
+@NearMe_HostAddress = http://localhost:5170
+
+GET {{NearMe_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
