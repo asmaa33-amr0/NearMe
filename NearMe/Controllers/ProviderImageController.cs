@@ -25,7 +25,12 @@ namespace NearMe.Controllers
 
             return Ok (img);
         }
-
+        [HttpGet("provider/{providerId:int}")]
+        public IActionResult GetByProviderId(int providerId)
+        {
+            var images = _context.ProviderImages.Where(img => img.ProviderProfileId == providerId).ToList();
+            return Ok(images);
+        }
 
         [HttpPost]
         [Authorize]

@@ -56,7 +56,7 @@ namespace NearMe.Controllers
             return Ok(categoryi);
         }
 
-        [HttpDelete]
+        [HttpDelete("{id:int}")]
         public ActionResult DeleteById(int id) { 
 
             var category = _context.Categories.FirstOrDefault(c=>c.Id == id);

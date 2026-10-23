@@ -56,7 +56,7 @@ namespace NearMe.Controllers
             return Ok(region);
         }
 
-        [HttpDelete]
+        [HttpDelete("{id:int}")]
         public IActionResult DeleteById(int id)
         {
             var region = _context.Regions.Find(id);
@@ -69,7 +69,7 @@ namespace NearMe.Controllers
         [HttpGet("{name}")]
         public ActionResult search(string name)
         {
-            var region = _context.Categories.FirstOrDefault(region => region.Name == name);
+            var region = _context.Regions.FirstOrDefault(region => region.name == name);
             if (region == null)
             {
                 return NoContent();
