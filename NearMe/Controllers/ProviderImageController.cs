@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using NearMe.Data;
 using NearMe.DTOs;
 using NearMe.Models;
@@ -32,52 +33,83 @@ namespace NearMe.Controllers
             return Ok(images);
         }
 
+
         [HttpPost]
-        [Authorize]
-        public ActionResult Create([FromBody] providerImageDTO providerImage)
+        [Authorize(Roles = "Provider")]
+        public async Task<ActionResult> Create([FromBody] ProviderImageDTO providerImage)
         {
-            if (providerImage == null || string.IsNullOrEmpty(providerImage.imgurl))
+            if (providerImage == null ||
+                string.IsNullOrWhiteSpace(providerImage.ImageUrl))
             {
                 return BadRequest("Invalid image data.");
             }
 
-            // Get the provider ID from the authenticated user's claims
-            var providerIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            // Get the authenticated user's ID
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            if (string.IsNullOrEmpty(providerIdClaim) || !int.TryParse(providerIdClaim, out int providerProfileId))
+            if (string.IsNullOrEmpty(userId))
             {
-                return Unauthorized("Unable to identify the provider.");
+                return Unauthorized("Unable to identify the user.");
             }
 
-            // Map DTO to the entity and link it to the provider
+            // Find the provider profile belonging to this user
+            var providerProfile = await _context.ProviderProfiles
+                .FirstOrDefaultAsync(p => p.UserId == userId);
+
+            if (providerProfile == null)
+            {
+                return NotFound("Provider profile not found.");
+            }
+
+            // Create the image and link it to the provider profile
             var image = new ProviderImage
             {
-                ImageUrl = providerImage.imgurl,
-                ProviderProfileId = providerProfileId
+                ImageUrl = providerImage.ImageUrl,
+                ProviderProfileId = providerProfile.Id
             };
 
             _context.ProviderImages.Add(image);
-            _context.SaveChanges(); // Synchronous save
+            await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetById), new { id = image.Id }, image);
+            return CreatedAtAction(
+                nameof(GetById),
+                new { id = image.Id },
+                image
+            );
         }
 
         [HttpPut("{id:int}")]
-        public ActionResult Update(  int id, [FromBody] providerImageDTO providerImage) { 
-        
-        var image =  _context.ProviderImages.Find(id);
-            image.ImageUrl = providerImage.imgurl;
-            _context.SaveChanges();
+        [Authorize(Roles = Roles.Provider)]
+        public ActionResult Update(int id, [FromBody] ProviderImageDTO providerImage)
+        {
+            var image = _context.ProviderImages
+                .Include(i => i.ProviderProfile)
+                .FirstOrDefault(i => i.Id == id);
+            if (image == null) return NotFound();
 
-            return Ok(image);
-        
-        }
-        [HttpDelete]
-        public ActionResult DeleteById(int id) {
-            var img = _context.ProviderImages.FirstOrDefault(img => img.Id == id);
-            _context.ProviderImages.Remove (img);
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (image.ProviderProfile.UserId != userId) return Forbid();
+
+            image.ImageUrl = providerImage.ImageUrl;
             _context.SaveChanges();
-            return NoContent(); 
+            return Ok(image);
+        }
+        [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Provider")]
+        public ActionResult DeleteById(int id)
+        {
+            var img = _context.ProviderImages.Include(i => i.ProviderProfile).FirstOrDefault(i => i.Id == id);
+            if (img == null) return NotFound();
+
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (img.ProviderProfile.UserId != userId)
+            {
+                return Forbid();
+            }
+
+            _context.ProviderImages.Remove(img);
+            _context.SaveChanges();
+            return NoContent();
         }
 
     }

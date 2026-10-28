@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using NearMe.Data;
 using NearMe.DTOs;
 using NearMe.Models;
+using System.Linq.Expressions;
 using System.Security.Claims;
 
 namespace NearMe.Controllers
@@ -17,186 +19,199 @@ namespace NearMe.Controllers
         {
             _context = context;
         }
+
+        private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        private static readonly Expression<Func<ProviderProfile, ProviderListItemDto>> ToListItem = p => new ProviderListItemDto
+        {
+            Id = p.Id,
+            BusinessName = p.BusinessName,
+            Address = p.Address,
+            CategoryName = p.Category.Name,
+            RegionName = p.Region.name,
+            AverageRating = p.Reviews.Any() ? p.Reviews.Average(r => r.Rating) : 0,
+            ReviewsCount = p.Reviews.Count()
+        };
+
+        private static readonly Expression<Func<ProviderProfile, ProviderResponseDto>> ToDetails = p => new ProviderResponseDto
+        {
+            Id = p.Id,
+            BusinessName = p.BusinessName,
+            Address = p.Address,
+            Description = p.Description,
+            AverageRating = p.Reviews.Any() ? p.Reviews.Average(r => r.Rating) : 0,
+            ReviewsCount = p.Reviews.Count(),
+            Category = new CategoryDto { Name = p.Category.Name, IconPath = p.Category.IconPath },
+            Region = p.Region.name,
+            Gallery = p.Gallery.Select(img => new ProviderImageDTO { ImageUrl = img.ImageUrl }).ToList()
+        };
+
         [HttpGet]
-        public ActionResult<IEnumerable<ProviderListItemDto >> GetAll()
+        public async Task<ActionResult<IEnumerable<ProviderListItemDto>>> GetAll(
+            [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
-            var providerProfiles = _context.ProviderProfiles
-                .Select(p => new ProviderListItemDto
-                {
-                    Id = p.Id,
-                    BusinessName = p.BusinessName,
-                    Address = p.Address,
-                    CategoryName = p.Category.Name,  
-                    RegionName = p.Region.name   
-                    
-                })
-                .ToList();  
+            page = Math.Max(page, 1);
+            pageSize = Math.Clamp(pageSize, 1, 50);
 
-            return Ok(providerProfiles);
-        }
-
-        
-        [HttpGet("{id:int}")]
-        public ActionResult<ProviderResponseDto> GetById(int id)
-        {
-            var provider = _context.ProviderProfiles
-                .Where(p => p.Id == id)  
-                .Select(p => new ProviderResponseDto
-                {
-                    Id = p.Id,
-                    BusinessName = p.BusinessName,
-                    Address = p.Address,
-                    AverageRating = p.Reviews.Any() ? p.Reviews.Average(r => r.Rating) : 0,
-                    ReviewsCount = p.Reviews.Count(),
-                    Description = p.Description,
-
-                    category = new CategoryDto
-                    {
-                        Name = p.Category.Name,
-                        IconPath = p.Category.IconPath
-                    },
-
-                  
-                    Region =  p.Region.name
-                    ,
-
-                    Gallery = p.Gallery.Select(img => new providerImageDTO
-                    {
-                        imgurl = img.ImageUrl
-                    }).ToList()
-                })
-                .FirstOrDefault(); 
-
-            if (provider == null)
-            {
-                return NotFound(); 
-            }
-
-            return Ok(provider);
-        }
-        
-        [HttpGet("search")]
-        public ActionResult<IEnumerable<ProviderListItemDto>> Search(
-    [FromQuery] string? name,
-    [FromQuery] int? categoryId,
-    [FromQuery] int? regionId,
-    [FromQuery] string? BusinessName)
-        {
-           var query = _context.ProviderProfiles.AsQueryable();
-             
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                query = query.Where(p => p.BusinessName.Contains(name));
-            }
-
-            
-            if (categoryId.HasValue)
-            {
-                query = query.Where(p => p.CategoryId == categoryId.Value);
-            }
-
-              if (regionId.HasValue)
-            {
-                query = query.Where(p => p.RegionId == regionId.Value);
-            }
-
-             var result = query
-                .Select(p => new ProviderListItemDto
-                {
-                    Id = p.Id,
-                    BusinessName = p.BusinessName,
-                    Address = p.Address,
-                    CategoryName = p.Category.Name,
-                    RegionName = p.Region.name,
-                    AverageRating = p.Reviews.Any() ? p.Reviews.Average(r => r.Rating) : 0,
-                    ReviewsCount = p.Reviews.Count()
-
-                })
-                .ToList();
+            var result = await _context.ProviderProfiles
+                .AsNoTracking()
+                .OrderBy(p => p.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(ToListItem)
+                .ToListAsync();
 
             return Ok(result);
         }
-        [HttpGet("my-profile")]
-        [Authorize]
-        public ActionResult<ProviderResponseDto> GetMyProfile()
+
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<ProviderResponseDto>> GetById(int id)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var provider = await _context.ProviderProfiles
+                .AsNoTracking()
+                .Where(p => p.Id == id)
+                .Select(ToDetails)
+                .FirstOrDefaultAsync();
 
-            var provider = _context.ProviderProfiles
-                .Where(p => p.UserId == userId)
-                .Select(p => new ProviderResponseDto
-                {
-                    Id = p.Id,
-                    BusinessName = p.BusinessName,
-                    Address = p.Address,
-                    AverageRating = p.Reviews.Any() ? p.Reviews.Average(r => r.Rating) : 0,
-                    ReviewsCount = p.Reviews.Count(),
-                    Description = p.Description,
-                    category = new CategoryDto { Name = p.Category.Name, IconPath = p.Category.IconPath },
-                    Region = p.Region.name,
-                    Gallery = p.Gallery.Select(img => new providerImageDTO { imgurl = img.ImageUrl }).ToList()
-                })
-                .FirstOrDefault();
-
-            if (provider == null) return NotFound("You don't have a provider profile yet.");
-
-            return Ok(provider);
+            return provider == null ? NotFound() : Ok(provider);
         }
-        [HttpPost]
-        [Authorize] 
-        public ActionResult Create([FromBody] CreateProviderProfileDto providerDTO)
+
+        [HttpGet("search")]
+        public async Task<ActionResult<IEnumerable<ProviderListItemDto>>> Search(
+            [FromQuery] string? name,
+            [FromQuery] int? categoryId,
+            [FromQuery] int? regionId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                return Unauthorized();
-            }
+            page = Math.Max(page, 1);
+            pageSize = Math.Clamp(pageSize, 1, 50);
+
+            var query = _context.ProviderProfiles.AsNoTracking().AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(name))
+                query = query.Where(p => p.BusinessName.Contains(name));
+
+            if (categoryId.HasValue)
+                query = query.Where(p => p.CategoryId == categoryId.Value);
+
+            if (regionId.HasValue)
+                query = query.Where(p => p.RegionId == regionId.Value);
+
+            var result = await query
+                .OrderBy(p => p.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(ToListItem)
+                .ToListAsync();
+
+            return Ok(result);
+        }
+
+        [HttpGet("my-profile")]
+        [Authorize(Roles = "Provider")]
+        public async Task<ActionResult<ProviderResponseDto>> GetMyProfile()
+        {
+            var userId = CurrentUserId;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var provider = await _context.ProviderProfiles
+                .AsNoTracking()
+                .Where(p => p.UserId == userId)
+                .Select(ToDetails)
+                .FirstOrDefaultAsync();
+
+            return provider == null
+                ? NotFound("You don't have a provider profile yet.")
+                : Ok(provider);
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Provider")]
+        public async Task<ActionResult<ProviderResponseDto>> Create([FromBody] CreateProviderProfileDto dto)
+        {
+            var userId = CurrentUserId;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            if (await _context.ProviderProfiles.AnyAsync(p => p.UserId == userId))
+                return Conflict("You already have a provider profile.");
+
+            if (!await _context.Categories.AnyAsync(c => c.Id == dto.CategoryId))
+                return BadRequest("Category does not exist.");
+
+            if (!await _context.Regions.AnyAsync(r => r.id == dto.RegionId))
+                return BadRequest("Region does not exist.");
 
             var provider = new ProviderProfile
             {
-                UserId = userId,  
-                BusinessName = providerDTO.BusinessName,
-                Address = providerDTO.Address,
-                RegionId = providerDTO.RegionId,
-                CategoryId = providerDTO.CategoryId,
-                Description = providerDTO.Description,
-                IsApproved = false
+                UserId = userId,
+                BusinessName = dto.BusinessName,
+                Address = dto.Address,
+                RegionId = dto.RegionId,
+                CategoryId = dto.CategoryId,
+                Description = dto.Description
             };
 
             _context.ProviderProfiles.Add(provider);
-            _context.SaveChanges();
-            return Ok(provider);
+            await _context.SaveChangesAsync();
+
+            var result = await _context.ProviderProfiles
+                .AsNoTracking()
+                .Where(p => p.Id == provider.Id)
+                .Select(ToDetails)
+                .FirstAsync();
+
+            return CreatedAtAction(nameof(GetById), new { id = provider.Id }, result);
         }
+
         [HttpPut("{id:int}")]
-        [Authorize]
-        public ActionResult Edit(int id, [FromBody] CreateProviderProfileDto providerDTO)
+        [Authorize(Roles = "Provider")]
+        public async Task<ActionResult<ProviderResponseDto>> Edit(int id, [FromBody] CreateProviderProfileDto dto)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userId = CurrentUserId;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
-            var provider = _context.ProviderProfiles.FirstOrDefault(p => p.Id == id);
-            if (provider == null) return NotFound();
-              if (provider.UserId != userId)
-            {
-                return Forbid(); 
-            }
+            var provider = await _context.ProviderProfiles.FirstOrDefaultAsync(p => p.Id == id);
+            if (provider == null) return NotFound("Provider profile not found.");
 
-            provider.Address = providerDTO.Address;
-            provider.RegionId = providerDTO.RegionId;
-            provider.CategoryId = providerDTO.CategoryId;
-            provider.Description = providerDTO.Description;
-            provider.BusinessName = providerDTO.BusinessName;
+            if (provider.UserId != userId) return Forbid();
 
-            _context.SaveChanges();
-            return Ok(provider);
+            if (!await _context.Categories.AnyAsync(c => c.Id == dto.CategoryId))
+                return BadRequest("Category does not exist.");
+
+            if (!await _context.Regions.AnyAsync(r => r.id == dto.RegionId))
+                return BadRequest("Region does not exist.");
+
+            provider.BusinessName = dto.BusinessName;
+            provider.Address = dto.Address;
+            provider.RegionId = dto.RegionId;
+            provider.CategoryId = dto.CategoryId;
+            provider.Description = dto.Description;
+
+            await _context.SaveChangesAsync();
+
+            var result = await _context.ProviderProfiles
+                .AsNoTracking()
+                .Where(p => p.Id == id)
+                .Select(ToDetails)
+                .FirstAsync();
+
+            return Ok(result);
         }
 
         [HttpDelete("{id:int}")]
-        public ActionResult Delete(int id)
+        [Authorize]
+        public async Task<IActionResult> Delete(int id)
         {
-            var provider = _context.ProviderProfiles.FirstOrDefault(p => p.Id == id);
+            var provider = await _context.ProviderProfiles.FirstOrDefaultAsync(p => p.Id == id);
+            if (provider == null) return NotFound();
+
+            if (provider.UserId != CurrentUserId && !User.IsInRole("Admin"))
+                return Forbid();
+
             _context.ProviderProfiles.Remove(provider);
-            _context.SaveChanges();
-            return Ok();
+            await _context.SaveChangesAsync();
+            return NoContent();
         }
     }
 }

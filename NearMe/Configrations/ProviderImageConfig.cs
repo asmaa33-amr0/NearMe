@@ -13,7 +13,7 @@ namespace NearMe.Configrations
             builder.HasOne(img=>img.ProviderProfile)
                 .WithMany(p=>p.Gallery)
                 .HasForeignKey(img=>img.ProviderProfileId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
 
         }
     }

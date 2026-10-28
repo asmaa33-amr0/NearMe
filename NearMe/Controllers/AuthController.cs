@@ -16,7 +16,9 @@ namespace NearMe.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IConfiguration _configuration;
 
-        public AuthController(UserManager<ApplicationUser> userManager, IConfiguration configuration)
+        public AuthController(
+            UserManager<ApplicationUser> userManager,
+            IConfiguration configuration)
         {
             _userManager = userManager;
             _configuration = configuration;
@@ -26,33 +28,52 @@ namespace NearMe.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
+            var role = model.AccountType == AccountType.Provider
+                ? Roles.Provider
+                : Roles.User;
+
             var user = new ApplicationUser
             {
                 UserName = model.Email,
                 Email = model.Email,
                 fullname = model.FullName,
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTime.UtcNow
             };
 
             var result = await _userManager.CreateAsync(user, model.Password);
-
             if (!result.Succeeded)
-            {
                 return BadRequest(result.Errors);
+
+            var roleResult = await _userManager.AddToRoleAsync(user, role);
+            if (!roleResult.Succeeded)
+            {
+                await _userManager.DeleteAsync(user);
+                return BadRequest(roleResult.Errors);
             }
 
-            return Ok(new { message = "تم إنشاء الحساب بنجاح" });
+            return Ok(new
+            {
+                message = "تم إنشاء الحساب بنجاح",
+                role
+            });
         }
 
-        // POST: api/auth/login
+        // POST: api/auth/login  (user / provider / admin)
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
             var user = await _userManager.FindByEmailAsync(model.Email);
-            if (user == null || !await _userManager.CheckPasswordAsync(user, model.Password))
+
+            if (user == null ||
+                !await _userManager.CheckPasswordAsync(user, model.Password))
             {
-                return Unauthorized(new { message = "الإيميل أو كلمة المرور غير صحيحة" });
+                return Unauthorized(new
+                {
+                    message = "الإيميل أو كلمة المرور غير صحيحة"
+                });
             }
+
+            var roles = await _userManager.GetRolesAsync(user);
 
             var authClaims = new List<Claim>
             {
@@ -61,20 +82,30 @@ namespace NearMe.Controllers
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
-            var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
+            foreach (var role in roles)
+                authClaims.Add(new Claim(ClaimTypes.Role, role));
+
+            var jwtKey = _configuration["Jwt:Key"];
+            if (string.IsNullOrEmpty(jwtKey))
+                return StatusCode(500, new { message = "JWT key is not configured." });
+
+            var authSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey));
 
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
-                expires: DateTime.Now.AddDays(7),
+                expires: DateTime.UtcNow.AddDays(7),
                 claims: authClaims,
-                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+                signingCredentials: new SigningCredentials(
+                    authSigningKey, SecurityAlgorithms.HmacSha256)
             );
 
             return Ok(new
             {
                 token = new JwtSecurityTokenHandler().WriteToken(token),
-                expiration = token.ValidTo
+                expiration = token.ValidTo,
+                roles
             });
         }
     }

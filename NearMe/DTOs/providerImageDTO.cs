@@ -1,7 +1,10 @@
-﻿namespace NearMe.DTOs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace NearMe.DTOs
 {
-    public class providerImageDTO
+    public class ProviderImageDTO
     {
-        public string imgurl { get; set; } = string.Empty;
+        [Required, MaxLength(500)]
+        public string ImageUrl { get; set; } = string.Empty;
     }
 }

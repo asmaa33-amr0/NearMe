@@ -1,8 +1,10 @@
-﻿namespace NearMe.DTOs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace NearMe.DTOs
 {
     public class RegionDto
     {
-       
-        public string RegionName { get; set; }
+        [Required, MaxLength(500)]
+        public string RegionName { get; set; } = string.Empty;
     }
 }

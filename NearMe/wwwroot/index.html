@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NearMe | Services near you</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Readex+Pro:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="wrap bar"><div class="logo"><i class="pin"></i>NearMe</div><nav id="nav"></nav></div>
+  <div class="hero" id="hero"><div class="wrap">
+    <h1>Find the service you need, right near you.</h1>
+    <p>Restaurants, repair shops, clinics and stores in your area, with reviews from people who've been.</p>
+  </div></div>
+</header>
+<main class="wrap">
+  <section id="v-browse">
+    <form class="find" id="find">
+      <input id="q" placeholder="Business name" aria-label="Business name">
+      <select id="c" aria-label="Category"></select>
+      <select id="g" aria-label="Region"></select>
+      <button class="btn primary">Search</button>
+    </form>
+    <div id="res"></div>
+  </section>
+  <section id="v-mine" hidden></section>
+  <section id="v-admin" hidden></section>
+</main>
+<dialog id="dr" class="drawer"></dialog>
+<dialog id="auth"></dialog>
+<div id="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>
