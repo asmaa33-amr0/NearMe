@@ -7,4 +7,10 @@ namespace NearMe.DTOs
         [Required, MaxLength(500)]
         public string ImageUrl { get; set; } = string.Empty;
     }
+    public class ProviderImageResponseDto
+    {
+        public int Id { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;
+        public int ProviderProfileId { get; set; }
+    }
 }

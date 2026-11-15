@@ -16,7 +16,7 @@ namespace NearMe.Configrations
                    .WithMany()
                    .HasForeignKey(r => r.UserId)
                    .OnDelete(DeleteBehavior.Restrict);
-
+            builder.HasIndex(r => new { r.UserId, r.ProviderProfileId }).IsUnique();
             // Review -> ProviderProfile
             builder.HasOne(r => r.providerProfile)
                    .WithMany(p => p.Reviews)

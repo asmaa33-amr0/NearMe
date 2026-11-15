@@ -7,6 +7,7 @@ namespace NearMe.Configrations
     {
         public void Configure(EntityTypeBuilder <ProviderProfile> builder)
         {
+            builder.Property(p => p.Contact).HasMaxLength(300);
             builder.HasKey(p => p.Id);
             builder.Property(p=>p.CategoryId).IsRequired();
             builder.Property(p => p.BusinessName).IsRequired();

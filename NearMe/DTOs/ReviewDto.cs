@@ -23,4 +23,9 @@ namespace NearMe.DTOs
         public int ProviderProfileId { get; set; }
         public string? UserName { get; set; }
     }
+    public class UpdateReviewDto
+    {
+        [Range(1, 5)] public int Rating { get; set; }
+        [StringLength(1000)] public string? Comment { get; set; }
+    }
 }

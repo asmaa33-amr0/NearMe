@@ -1,80 +1,64 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using NearMe.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using NearMe.DTOs;
-using NearMe.Models;
+using NearMe.Services;
+using NearMe.Services.Common;
+
 namespace NearMe.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    
     public class RegionController : ControllerBase
     {
+        private readonly RegionService _service;
 
-
-        private readonly ApplicationDbContext _context;
-
-        public RegionController(ApplicationDbContext context)
+        public RegionController(RegionService service)
         {
-            _context = context;
+            _service = service;
         }
 
-      
         [HttpGet]
-        public IActionResult GetAll()
+        public async Task<ActionResult> GetAll()
         {
-            var regions = _context.Regions.ToList();
-            return Ok(regions);
-
+            return Ok(await _service.GetAllAsync());
         }
 
         [HttpGet("{id:int}")]
-        public IActionResult GetById(int id)
+        public async Task<ActionResult> GetById(int id)
         {
-            var region = _context.Regions.Find( id);
-            return Ok(region);
+            return this.ToActionResult(await _service.GetByIdAsync(id));
+        }
 
+        [HttpGet("{name}")]
+        public async Task<ActionResult> Search(string name)
+        {
+            var region = await _service.GetByNameAsync(name);
+            if (region == null) return NoContent();
+            return Ok(region);
         }
 
         [HttpPost]
-        public IActionResult Create ([FromBody] RegionDto region)
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> Create([FromBody] RegionDto dto)
         {
-            var regionn = new Region
-            {
-                name = region.RegionName
-            };
-            _context.Regions.Add(regionn);
-            
-            _context.SaveChanges();
-            return CreatedAtAction(nameof(GetById), new { id = regionn.id}, regionn);
-}
+            var region = await _service.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = region.id }, region);
+        }
+
         [HttpPut("{id:int}")]
-        public IActionResult updateregion (int id, [FromBody] RegionDto updatedRegion)
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> Update(int id, [FromBody] RegionDto dto)
         {
-            var region = _context.Regions.Find(id);
-            region.name = updatedRegion.RegionName;
-            _context.SaveChanges();
-            return Ok(region);
+            return this.ToActionResult(await _service.UpdateAsync(id, dto));
         }
 
         [HttpDelete("{id:int}")]
-        public IActionResult DeleteById(int id)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete(int id)
         {
-            var region = _context.Regions.Find(id);
-            _context.Regions.Remove(region);
-            _context.SaveChanges();
-            return NoContent();
-        }
-
-
-        [HttpGet("{name}")]
-        public ActionResult search(string name)
-        {
-            var region = _context.Regions.FirstOrDefault(region => region.name == name);
-            if (region == null)
-            {
-                return NoContent();
-            }
-            return Ok(region);
+            var result = await _service.DeleteAsync(id);
+            if (result.Success) return NoContent();
+            return this.ToActionResult(result);
         }
     }
 }

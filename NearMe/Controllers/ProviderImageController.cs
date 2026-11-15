@@ -1,9 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using NearMe.Data;
 using NearMe.DTOs;
-using NearMe.Models;
+using NearMe.Services;
+using NearMe.Services.Common;
 using System.Security.Claims;
 
 namespace NearMe.Controllers
@@ -12,105 +11,69 @@ namespace NearMe.Controllers
     [Route("api/[controller]")]
     public class ProviderImageController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly ProviderImageService _service;
 
-
-
-        public ProviderImageController(ApplicationDbContext context)
+        public ProviderImageController(ProviderImageService service)
         {
-            _context = context;
+            _service = service;
         }
+
+        private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
         [HttpGet("{id:int}")]
-        public ActionResult GetById(int id) { 
-        var img= _context.ProviderImages. FirstOrDefault(img => img.Id == id);
-
-            return Ok (img);
-        }
-        [HttpGet("provider/{providerId:int}")]
-        public IActionResult GetByProviderId(int providerId)
+        public async Task<ActionResult> GetById(int id)
         {
-            var images = _context.ProviderImages.Where(img => img.ProviderProfileId == providerId).ToList();
-            return Ok(images);
+            return this.ToActionResult(await _service.GetByIdAsync(id));
         }
 
+        [HttpGet("provider/{providerId:int}")]
+        public async Task<ActionResult> GetByProviderId(int providerId)
+        {
+            return this.ToActionResult(await _service.GetByProviderAsync(providerId));
+        }
 
         [HttpPost]
         [Authorize(Roles = "Provider")]
-        public async Task<ActionResult> Create([FromBody] ProviderImageDTO providerImage)
+        public async Task<ActionResult> Create([FromBody] ProviderImageDTO dto)
         {
-            if (providerImage == null ||
-                string.IsNullOrWhiteSpace(providerImage.ImageUrl))
-            {
-                return BadRequest("Invalid image data.");
-            }
+            if (CurrentUserId == null) return Unauthorized();
 
-            // Get the authenticated user's ID
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var result = await _service.AddAsync(CurrentUserId, dto);
+            if (!result.Success) return this.ToActionResult(result);
 
-            if (string.IsNullOrEmpty(userId))
-            {
-                return Unauthorized("Unable to identify the user.");
-            }
+            return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result.Data);
+        }
 
-            // Find the provider profile belonging to this user
-            var providerProfile = await _context.ProviderProfiles
-                .FirstOrDefaultAsync(p => p.UserId == userId);
+        [HttpPost("upload")]
+        [Authorize(Roles = "Provider")]
+        public async Task<ActionResult> Upload(IFormFile file)
+        {
+            if (CurrentUserId == null) return Unauthorized();
 
-            if (providerProfile == null)
-            {
-                return NotFound("Provider profile not found.");
-            }
+            var result = await _service.UploadAsync(CurrentUserId, file);
+            if (!result.Success) return this.ToActionResult(result);
 
-            // Create the image and link it to the provider profile
-            var image = new ProviderImage
-            {
-                ImageUrl = providerImage.ImageUrl,
-                ProviderProfileId = providerProfile.Id
-            };
-
-            _context.ProviderImages.Add(image);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(
-                nameof(GetById),
-                new { id = image.Id },
-                image
-            );
+            return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result.Data);
         }
 
         [HttpPut("{id:int}")]
-        [Authorize(Roles = Roles.Provider)]
-        public ActionResult Update(int id, [FromBody] ProviderImageDTO providerImage)
-        {
-            var image = _context.ProviderImages
-                .Include(i => i.ProviderProfile)
-                .FirstOrDefault(i => i.Id == id);
-            if (image == null) return NotFound();
-
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (image.ProviderProfile.UserId != userId) return Forbid();
-
-            image.ImageUrl = providerImage.ImageUrl;
-            _context.SaveChanges();
-            return Ok(image);
-        }
-        [HttpDelete("{id:int}")]
         [Authorize(Roles = "Provider")]
-        public ActionResult DeleteById(int id)
+        public async Task<ActionResult> Update(int id, [FromBody] ProviderImageDTO dto)
         {
-            var img = _context.ProviderImages.Include(i => i.ProviderProfile).FirstOrDefault(i => i.Id == id);
-            if (img == null) return NotFound();
-
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (img.ProviderProfile.UserId != userId)
-            {
-                return Forbid();
-            }
-
-            _context.ProviderImages.Remove(img);
-            _context.SaveChanges();
-            return NoContent();
+            if (CurrentUserId == null) return Unauthorized();
+            return this.ToActionResult(await _service.UpdateAsync(id, CurrentUserId, dto));
         }
 
+        [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Provider,Admin")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            if (CurrentUserId == null) return Unauthorized();
+
+            var result = await _service.DeleteAsync(id, CurrentUserId, User.IsInRole("Admin"));
+            if (result.Success) return NoContent();
+
+            return this.ToActionResult(result);
+        }
     }
 }

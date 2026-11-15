@@ -2,9 +2,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using NearMe.Models;
 using NearMe.Data;
+using NearMe.Models;
+using NearMe.Services;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -74,9 +75,17 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true
     };
 });
+builder.Services.AddScoped<ReviewService>();
+builder.Services.AddScoped<RegionService>();
+builder.Services.AddScoped<ProviderImageService>();
+builder.Services.AddScoped<ImageStorageService>();
+builder.Services.AddScoped<ProviderService>();
+builder.Services.AddScoped<CategoryService>();
+
+
+
 
 var app = builder.Build();
-
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

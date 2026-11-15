@@ -1,79 +1,76 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using NearMe.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using NearMe.DTOs;
-using NearMe.Models;
+using NearMe.Services;
+using NearMe.Services.Common;
 
 namespace NearMe.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-
     public class CategoryController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly CategoryService _service;
+        private readonly ImageStorageService _images;
 
-        public CategoryController(ApplicationDbContext context)
+        public CategoryController(CategoryService service, ImageStorageService images)
         {
-            _context = context;
+            _service = service;
+            _images = images;
         }
-
 
         [HttpGet]
-        public ActionResult GetAll()
+        public async Task<ActionResult> GetAll()
         {
-            var Category = _context.Categories.ToList();
-            return Ok(Category);
-
+            return Ok(await _service.GetAllAsync());
         }
+
         [HttpGet("{id:int}")]
-        public ActionResult GetById(int id)
+        public async Task<ActionResult> GetById(int id)
         {
-            var Category = _context.Categories.FirstOrDefault(c => c.Id == id);
-            return Ok(Category);
-        }
-
-        [HttpPost]
-        public ActionResult Create([FromBody] CategoryDto category)
-        {
-            var categoryi = new Category
-            {
-                Name = category.Name,
-                IconPath = category.IconPath
-
-            };
-            _context.Categories.Add(categoryi);
-            _context.SaveChanges();
-
-            return CreatedAtAction(nameof(GetById), new { id = categoryi.Id }, categoryi);
-        }
-        [HttpPut("{id:int}")]
-        public ActionResult Update(int id,[FromBody] CategoryDto category) {
-        
-        var categoryi = _context.Categories.FirstOrDefault(c=>c.Id == id);
-            categoryi.Name = category.Name;
-            categoryi.IconPath = category.IconPath;
-            _context.SaveChanges();
-            return Ok(categoryi);
-        }
-
-        [HttpDelete("{id:int}")]
-        public ActionResult DeleteById(int id) { 
-
-            var category = _context.Categories.FirstOrDefault(c=>c.Id == id);
-            _context.Categories.Remove(category);
-            _context.SaveChanges();
-            return NoContent();
+            return this.ToActionResult(await _service.GetByIdAsync(id));
         }
 
         [HttpGet("{name}")]
-        public ActionResult search(string name)
+        public async Task<ActionResult> Search(string name)
         {
-            var category = _context.Categories.FirstOrDefault(category => category.Name == name);
-            if (category == null)
-            {
-                return NoContent();
-            }
+            var category = await _service.GetByNameAsync(name);
+            if (category == null) return NoContent();
             return Ok(category);
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> Create([FromBody] CategoryDto dto)
+        {
+            var result = await _service.CreateAsync(dto);
+            if (!result.Success) return this.ToActionResult(result);
+            return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result.Data);
+        }
+
+        [HttpPut("{id:int}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> Update(int id, [FromBody] CategoryDto dto)
+        {
+            return this.ToActionResult(await _service.UpdateAsync(id, dto));
+        }
+
+        [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var result = await _service.DeleteAsync(id);
+            if (result.Success) return NoContent();
+            return this.ToActionResult(result);
+        }
+
+        [HttpPost("upload-icon")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> UploadIcon(IFormFile file)
+        {
+            var result = await _images.SaveAsync(file, "categories");
+            if (!result.Success) return this.ToActionResult(result);
+            return Ok(new { iconPath = result.Data });
         }
     }
 }

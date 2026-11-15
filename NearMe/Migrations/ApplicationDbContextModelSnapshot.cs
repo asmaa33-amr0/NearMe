@@ -290,11 +290,18 @@ namespace NearMe.Migrations
                     b.Property<int>("CategoryId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Contact")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsApproved")
-                        .HasColumnType("bit");
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("float");
 
                     b.Property<int>("RegionId")
                         .HasColumnType("int");
@@ -362,7 +369,8 @@ namespace NearMe.Migrations
 
                     b.HasIndex("ProviderProfileId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "ProviderProfileId")
+                        .IsUnique();
 
                     b.ToTable("Reviews");
                 });
@@ -423,7 +431,7 @@ namespace NearMe.Migrations
                     b.HasOne("NearMe.Models.ProviderProfile", "ProviderProfile")
                         .WithMany("Gallery")
                         .HasForeignKey("ProviderProfileId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("ProviderProfile");
