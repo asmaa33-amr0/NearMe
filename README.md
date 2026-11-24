@@ -17,6 +17,36 @@ Built with **ASP.NET Core Web API**, **Entity Framework Core**, **SQL Server**, 
 - 🛠️ **Admin tools** for managing categories (with icon upload) and regions
 - 📄 **Swagger / OpenAPI** documentation with Bearer token support
 
+**Demo Video**
+
+https://drive.google.com/file/d/1HFEW7xMQ6NgkSYmt1yd_2-ym0yPenVdd/view?usp=drive_link
+
+**Home page**
+
+<img width="626" height="313" alt="Screenshot 2026-11-15 193103" src="https://github.com/user-attachments/assets/0157750c-e4c2-4209-bebc-bce4b2cc0de0" />
+
+
+<img width="626" height="313" alt="Screenshot 2026-11-15 194234" src="https://github.com/user-attachments/assets/982c1a37-fd14-49db-9cb8-ea3f76723948" />
+
+**Register & Login**
+
+<img width="617" height="398" alt="Screenshot 2026-11-22 230431" src="https://github.com/user-attachments/assets/6c73fffd-3a5e-4f1c-adf5-ec260456e081" />
+
+**Provider**
+
+<img width="620" height="311" alt="Screenshot 2026-11-22 230737" src="https://github.com/user-attachments/assets/85e64667-192b-4668-9939-c9eafc7919ca" />
+
+<img width="626" height="310" alt="Screenshot 2026-11-22 230845" src="https://github.com/user-attachments/assets/e6b7925f-c689-4817-a168-e7aae7a49f59" />
+
+**Admin**
+
+<img width="613" height="304" alt="Screenshot 2026-11-22 231209" src="https://github.com/user-attachments/assets/77b37a50-2cbf-4126-99a2-bbddeb2fc8b8" />
+
+
+
+
+
+
 ## 👥 Roles
 
 | Role | What they can do |
@@ -150,8 +180,7 @@ Controllers delegate to services, and services return a `ServiceResult<T>` that 
 - [ ] Map view with all providers as markers
 - [ ] Unit tests for the service layer
 - [ ] Docker support
-<img width="626" height="313" alt="Screenshot 2026-11-15 194234" src="https://github.com/user-attachments/assets/a3523b09-2393-441f-871a-9870ca906bc2" />
-
+ 
 ## 👩‍💻 Author
 
 **Asma**: [LinkedIn](www.linkedin.com/in/asmaa-amr-521382207) · [GitHub](https://github.com/asmaa33-amr0)
