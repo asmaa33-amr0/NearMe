@@ -150,7 +150,8 @@ Controllers delegate to services, and services return a `ServiceResult<T>` that 
 - [ ] Map view with all providers as markers
 - [ ] Unit tests for the service layer
 - [ ] Docker support
+<img width="626" height="313" alt="Screenshot 2026-11-15 194234" src="https://github.com/user-attachments/assets/a3523b09-2393-441f-871a-9870ca906bc2" />
 
 ## 👩‍💻 Author
 
-**Asma**: [LinkedIn](https://www.linkedin.com/in/your-profile) · [GitHub](https://github.com/your-username)
+**Asma**: [LinkedIn](www.linkedin.com/in/asmaa-amr-521382207) · [GitHub](https://github.com/asmaa33-amr0)
